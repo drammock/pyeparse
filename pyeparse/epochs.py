@@ -6,6 +6,7 @@
 from copy import deepcopy
 import numpy as np
 from scipy.optimize import fmin_slsqp
+from mne.filter import resample
 import warnings
 
 from ._event import Discrete
@@ -265,6 +266,46 @@ class Epochs(object):
         """
         index = (np.atleast_1d(times) - self.times[0]) * self.info['sfreq']
         return index.astype(int)
+
+    def resample(self, sfreq, npad='auto', window='boxcar', n_jobs=1,
+                 copy=False):
+        """Resample preloaded data
+
+        Parameters
+        ----------
+        sfreq : float
+            New sample rate to use
+        npad : int | str
+            Amount to pad the start and end of the data.
+            Can also be "auto" to use a padding that will result in
+            a power-of-two size (can be much faster).
+        window : string or tuple
+            Window to use in resampling. See scipy.signal.resample.
+        n_jobs : int
+            Number of jobs to run in parallel.
+
+        Returns
+        -------
+        epochs : instance of Epochs
+            The resampled epochs object.
+
+        See Also
+        --------
+        pyeparse.RawEDF.resample
+
+        Notes
+        -----
+        For some data, it may be more accurate to use npad=0 to reduce
+        artifacts. This is dataset dependent -- check your data!
+        """
+        epochs = self.copy() if copy else self
+        o_sfreq = epochs.info['sfreq']
+        epochs._data = resample(epochs._data, sfreq, o_sfreq, npad,
+                                window=window, n_jobs=n_jobs)
+        # adjust indirectly affected variables
+        epochs.info['sfreq'] = float(sfreq)
+        epochs._n_times = epochs._data.shape[2]
+        return epochs
 
     def copy(self):
         """Return a copy of Epochs.
